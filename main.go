@@ -233,5 +233,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("Mount fail: %v\n", err)
 	}
+	defer server.Unmount()
 	server.Wait()
 }
