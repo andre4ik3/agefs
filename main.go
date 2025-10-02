@@ -13,10 +13,10 @@ import (
 
 	"filippo.io/age"
 	"filippo.io/age/armor"
+	"github.com/alecthomas/kong"
 	"github.com/hanwen/go-fuse/v2/fs"
 	"github.com/hanwen/go-fuse/v2/fuse"
-
-	"github.com/alecthomas/kong"
+	"github.com/sevlyar/go-daemon"
 )
 
 type AgeFsFile struct {
@@ -27,9 +27,8 @@ type AgeFsFile struct {
 var CLI struct {
 	MetaFile   string   `help:"Path to metadata file that specifies which files to present" arg:""`
 	MountPoint string   `help:"Mount point where unencrypted files will be available" arg:""`
-	Identity   []string `help:"Path to one or more identity files" short:"i" required:""`
-	Debug      bool     `help:"Enable debug mode"`
 	Options    []string `help:"Options to pass to the mount point" short:"o"`
+	Foreground bool     `help:"Run in foreground" short:"f"`
 }
 
 var _ = (fs.FileReader)((*AgeFsFile)(nil))
@@ -70,7 +69,6 @@ func (n *AgeFsNode) Open(ctx context.Context, flags uint32) (fh fs.FileHandle, f
 		n.Armored = strings.HasPrefix(string(n.Data), armor.Header)
 	}
 
-	// TODO: add an option to decrypt every time instead of saving it?
 	if n.Decrypted == nil {
 		var reader io.Reader = bytes.NewBuffer(n.Data)
 		if n.Armored {
@@ -167,6 +165,28 @@ func main() {
 	var cli = CLI
 	_ = kong.Parse(&cli)
 
+	identitiesPaths := make([]string, 0)
+
+	opts := &fs.Options{}
+	opts.AllowOther = true
+
+	for _, options := range cli.Options {
+		for _, option := range strings.Split(options, ",") {
+			switch {
+			case strings.HasPrefix(option, "identity="):
+				identitiesPaths = append(identitiesPaths, option[len("identity="):])
+			case option == "debug":
+				opts.Debug = true
+			default:
+				opts.Options = append(opts.Options, option)
+			}
+		}
+	}
+
+	if len(identitiesPaths) == 0 {
+		log.Fatal("At least one identity file must be specified using identity=... option")
+	}
+
 	data, err := os.ReadFile(cli.MetaFile)
 	if err != nil {
 		log.Fatal(err)
@@ -180,7 +200,7 @@ func main() {
 
 	var identities []age.Identity
 
-	for _, path := range cli.Identity {
+	for _, path := range identitiesPaths {
 		log.Printf("Loading identities from path '%s'\n", path)
 		newIdentities, err := readFileIdentities(path)
 		if err != nil {
@@ -193,10 +213,18 @@ func main() {
 	log.Printf("Loaded %d identities\n", len(identities))
 	log.Printf("Mounting filesystem at '%s'\n", cli.MountPoint)
 
-	opts := &fs.Options{}
-	opts.AllowOther = true
-	opts.Debug = cli.Debug
-	opts.Options = append(cli.Options, "nobrowse")
+	if !cli.Foreground {
+		ctx := new(daemon.Context)
+		child, err := ctx.Reborn()
+
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		if child != nil {
+			return
+		}
+	}
 
 	uid := uint32(os.Getuid())
 	gid := uint32(os.Getgid())

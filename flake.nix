@@ -12,7 +12,12 @@
       pname = "agefs";
       version = "0.1.0";
       src = ./.;
-      vendorHash = "sha256-EcrR5UfqZZg0r8RZIu0acDk+DYuQXc1NILH5DACY2Pk=";
+      vendorHash = "sha256-CHLKtT16TfFecwKjz1Gpo7XvsiQyvn6JMi/AgTo/oeE=";
+      postInstall = ''
+        ln -s agefs "$out/bin/mount.agefs"
+        ln -s agefs "$out/bin/mount.fuse.agefs"
+        ln -s bin "$out/sbin"
+      '';
       meta = {
         mainProgram = "agefs";
         license = lib.licenses.mit;

@@ -7,70 +7,32 @@
 
 let
   cfg = config.age;
+  common = import ./common.nix { inherit pkgs lib; };
+  utils = import "${pkgs.path}/nixos/lib/utils.nix" {
+    inherit lib pkgs;
+    config = { };
+  };
 
-  /**
-    Converts an octal string like "0755" to a decimal integer like 493.
-  */
-  octalToInt =
-    octalString:
-    let
-      split = builtins.split "([0-9])" octalString;
-      digitLists = (builtins.filter builtins.isList split);
-      digits = builtins.map (x: builtins.fromJSON (builtins.elemAt x 0)) digitLists;
-      initial = {
-        exp = 1;
-        acc = 0;
-      };
-      op =
-        digit:
-        { exp, acc }:
-        {
-          exp = exp * 8;
-          acc = acc + digit * exp;
-        };
-      folded = lib.foldr op initial digits;
-    in
-    folded.acc;
+  options =
+    lib.map (path: "identity=${path}") cfg.identityPaths
+    ++ lib.optional pkgs.hostPlatform.isLinux "x-gvfs-hide"
+    ++ lib.optional pkgs.hostPlatform.isDarwin "nobrowse";
 
   args = [
     (lib.getExe cfg.package)
+    "-o"
+    (lib.concatStringsSep "," options)
   ]
-  ++ lib.map (path: "--identity=${path}") cfg.identityPaths
+  ++ lib.optional pkgs.hostPlatform.isDarwin "-f"
   ++ [
     cfg.metaFile
     cfg.secretsDir
   ];
 
   secretSubmodule = lib.types.submodule (
-    { name, config, ... }:
+    { name, ... }:
     {
-      options = {
-        name = lib.mkOption {
-          type = lib.types.str;
-          default = name;
-          example = "hello-world/my-secret";
-          description = ''
-            Relative path where the secret is made available.
-          '';
-        };
-
-        file = lib.mkOption {
-          type = lib.types.path;
-          description = ''
-            The encrypted age file that is decrypted at runtime.
-          '';
-        };
-
-        mode = lib.mkOption {
-          type = lib.types.str;
-          default = "0400";
-          example = "0440";
-          apply = octalToInt;
-          description = ''
-            Permission mode of the decrypted file at runtime.
-          '';
-        };
-      };
+      options = common.secretOpts { inherit common name; };
     }
   );
 in
@@ -78,38 +40,7 @@ in
 {
   _class = "homeManager";
 
-  options.age = {
-    package = lib.mkPackageOption pkgs "agefs" { };
-
-    metaFile = lib.mkOption {
-      type = lib.types.package;
-      internal = true;
-      readOnly = true;
-      default = pkgs.writeText "agefs-meta.json" (
-        builtins.toJSON (lib.mapAttrsToList (_: lib.id) cfg.secrets)
-      );
-      description = ''
-        A file passed to agefs that contains metadata about the secrets to expose.
-      '';
-    };
-
-    pluginPackages = lib.mkOption {
-      type = lib.types.listOf lib.types.package;
-      default = [ ];
-      description = ''
-        List of age plugins to add to agefs's PATH for decryption.
-      '';
-    };
-
-    identityPaths = lib.mkOption {
-      type = lib.types.listOf lib.types.path;
-      default = [ ];
-      description = ''
-        List of identity paths to use. X25519, SSH, and plugin identities are
-        supported. Encrypted identities as an Age file are NOT supported.
-      '';
-    };
-
+  options.age = common.rootOptions cfg // {
     # TODO: change to agenix directory
     secretsDir = lib.mkOption {
       type = lib.types.path;
@@ -139,9 +70,37 @@ in
         ProgramArguments = lib.map toString args;
         RunAtLoad = true;
         KeepAlive.SuccessfulExit = false;
-        StandardOutPath = "/tmp/agefs-home.log";
-        StandardErrorPath = "/tmp/agefs-home.log";
       };
+    };
+
+    systemd.user = {
+      automounts.${utils.escapeSystemdPath cfg.secretsDir} = {
+        Automount.Where = cfg.secretsDir;
+        Install.WantedBy = [ "default.target" ];
+      };
+      mounts.${utils.escapeSystemdPath cfg.secretsDir} = {
+        Mount = {
+          What = cfg.metaFile;
+          Where = cfg.secretsDir;
+          Type = "fuse.agefs";
+          Options = lib.concatStringsSep "," options;
+          Environment = "PATH=${
+            lib.makeBinPath ([ cfg.package ] ++ cfg.pluginPackages)
+          }:/run/wrappers/bin:/run/current-system/sw/bin";
+        };
+        Install.WantedBy = [ "default.target" ];
+      };
+    };
+
+    home.activation = lib.mkIf pkgs.hostPlatform.isDarwin {
+      agefs = lib.hm.dag.entryAfter [ "setupLaunchAgents" ] ''
+        if [[ ! -e "${cfg.secretsDir}/.agefs" ]]; then
+          /sbin/umount "${cfg.secretsDir}" > /dev/null || true
+          /bin/launchctl kickstart -k gui/$(id -u)/org.nix-community.home.agefs
+          echo "waiting for agefs..."
+          /bin/wait4path "${cfg.secretsDir}"/.agefs
+        fi
+      '';
     };
   };
 }
