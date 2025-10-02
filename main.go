@@ -70,6 +70,7 @@ func (n *AgeFsNode) Open(ctx context.Context, flags uint32) (fh fs.FileHandle, f
 		n.Armored = strings.HasPrefix(string(n.Data), armor.Header)
 	}
 
+	// TODO: add an option to decrypt every time instead of saving it?
 	if n.Decrypted == nil {
 		var reader io.Reader = bytes.NewBuffer(n.Data)
 		if n.Armored {
@@ -118,32 +119,6 @@ func (n *AgeFsNode) Getattr(ctx context.Context, f fs.FileHandle, out *fuse.Attr
 	return fs.OK
 }
 
-//func WalkDir(ctx context.Context, root *AgeFsRoot, parent *fs.Inode, path string) error {
-//	entries, err := os.ReadDir(path)
-//	if err != nil {
-//		return err
-//	}
-//
-//	for _, entry := range entries {
-//		path := filepath.Join(path, entry.Name())
-//		if entry.IsDir() {
-//			parent := parent.NewPersistentInode(ctx, &fs.Inode{}, fs.StableAttr{Mode: fuse.S_IFDIR})
-//			return WalkDir(ctx, root, parent, path)
-//		} else {
-//			info, err := entry.Info()
-//			if err != nil {
-//				return fmt.Errorf("while walking %s: %v", path, err)
-//			}
-//
-//			node := &AgeFsNode{Root: root, Path: path, Mode: info.Mode()}
-//			child := parent.NewPersistentInode(ctx, node, fs.StableAttr{Mode: fuse.S_IFREG})
-//			parent.AddChild(entry.Name(), child, false)
-//		}
-//	}
-//
-//	return nil
-//}
-
 type AgeFsRoot struct {
 	fs.Inode
 	Identities []age.Identity
@@ -155,6 +130,9 @@ type AgeFsRoot struct {
 var _ = (fs.NodeOnAdder)((*AgeFsRoot)(nil))
 
 func (root *AgeFsRoot) OnAdd(ctx context.Context) {
+	marker := root.NewPersistentInode(ctx, &fs.MemRegularFile{}, fs.StableAttr{Mode: fuse.S_IFREG})
+	root.AddChild(".agefs", marker, false)
+
 	for _, file := range root.Files {
 		dir, name := filepath.Split(filepath.Clean(file.Name))
 		parent := &root.Inode
@@ -175,11 +153,6 @@ func (root *AgeFsRoot) OnAdd(ctx context.Context) {
 		child := parent.NewPersistentInode(ctx, node, fs.StableAttr{Mode: fuse.S_IFREG})
 		parent.AddChild(name, child, false)
 	}
-
-	//err := WalkDir(ctx, root, &root.Inode, root.Dir)
-	//if err != nil {
-	//	log.Fatalf("error while walking directory: %v\n", err)
-	//}
 }
 
 type Meta struct {
@@ -233,6 +206,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("Mount fail: %v\n", err)
 	}
-	defer server.Unmount()
+
 	server.Wait()
 }
