@@ -98,6 +98,8 @@ in
         wantedBy = [ "multi-user.target" ];
       };
       mounts = lib.singleton {
+        requires = [ "basic.target" ];
+        after = [ "basic.target" ];
         what = toString cfg.metaFile;
         where = cfg.secretsDir;
         type = "fuse.agefs";
@@ -105,7 +107,6 @@ in
         mountConfig.Environment = "PATH=${
           lib.makeBinPath ([ cfg.package ] ++ cfg.pluginPackages)
         }:/run/wrappers/bin:/run/current-system/sw/bin";
-        wantedBy = [ "multi-user.target" ];
       };
     };
   };

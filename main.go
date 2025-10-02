@@ -103,13 +103,13 @@ func (n *AgeFsNode) Open(ctx context.Context, flags uint32) (fh fs.FileHandle, f
 func (n *AgeFsNode) Getattr(ctx context.Context, f fs.FileHandle, out *fuse.AttrOut) syscall.Errno {
 	out.Mode = *n.Meta.Mode
 
-	var uid uint32 = n.Root.Uid
+	var uid = n.Root.Uid
 	if n.Meta.Owner != nil {
 		uid = *n.Meta.Owner
 	}
 	out.Owner.Uid = uid
 
-	var gid uint32 = n.Root.Gid
+	var gid = n.Root.Gid
 	if n.Meta.Group != nil {
 		gid = *n.Meta.Group
 	}

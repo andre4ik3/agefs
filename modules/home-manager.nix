@@ -74,10 +74,11 @@ in
     };
 
     systemd.user = {
-      automounts.${utils.escapeSystemdPath cfg.secretsDir} = {
-        Automount.Where = cfg.secretsDir;
-        Install.WantedBy = [ "default.target" ];
-      };
+      # Regular users don't have permissions to do automounts
+      # automounts.${utils.escapeSystemdPath cfg.secretsDir} = {
+      #   Automount.Where = cfg.secretsDir;
+      #   Install.WantedBy = [ "default.target" ];
+      # };
       mounts.${utils.escapeSystemdPath cfg.secretsDir} = {
         Mount = {
           What = cfg.metaFile;
