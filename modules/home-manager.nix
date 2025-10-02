@@ -80,6 +80,7 @@ in
       #   Install.WantedBy = [ "default.target" ];
       # };
       mounts.${utils.escapeSystemdPath cfg.secretsDir} = {
+        Unit.Description = "Age Encrypted File System";
         Mount = {
           What = cfg.metaFile;
           Where = cfg.secretsDir;
@@ -89,7 +90,7 @@ in
             lib.makeBinPath ([ cfg.package ] ++ cfg.pluginPackages)
           }:/run/wrappers/bin:/run/current-system/sw/bin";
         };
-        Install.WantedBy = [ "default.target" ];
+        Install.WantedBy = [ "basic.target" ];
       };
     };
 

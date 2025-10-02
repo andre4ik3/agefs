@@ -94,12 +94,12 @@ in
     programs.fuse.userAllowOther = true;
     systemd = {
       automounts = lib.singleton {
+        description = "Age Encrypted File System Automount Point";
         where = cfg.secretsDir;
-        wantedBy = [ "multi-user.target" ];
+        wantedBy = [ "sysinit.target" ];
       };
       mounts = lib.singleton {
-        requires = [ "basic.target" ];
-        after = [ "basic.target" ];
+        description = "Age Encrypted File System";
         what = toString cfg.metaFile;
         where = cfg.secretsDir;
         type = "fuse.agefs";
@@ -107,6 +107,7 @@ in
         mountConfig.Environment = "PATH=${
           lib.makeBinPath ([ cfg.package ] ++ cfg.pluginPackages)
         }:/run/wrappers/bin:/run/current-system/sw/bin";
+        wantedBy = [ "multi-user.target" ];
       };
     };
   };
