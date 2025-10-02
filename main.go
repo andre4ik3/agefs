@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 
 	"filippo.io/age"
 	"filippo.io/age/armor"
@@ -222,6 +223,16 @@ func main() {
 		}
 
 		if child != nil {
+			for {
+				log.Println("Waiting for mountpoint to be created...")
+				_, err := os.Stat(cli.MountPoint + "/.agefs")
+				if err == nil {
+					break
+				} else {
+					time.Sleep(500 * time.Millisecond)
+				}
+			}
+			log.Println("Done")
 			return
 		}
 	}
