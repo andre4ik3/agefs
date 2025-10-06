@@ -52,8 +52,18 @@ type AgeFsNode struct {
 	Armored   bool
 }
 
+var _ = (fs.NodeUnlinker)((*AgeFsNode)(nil))
+var _ = (fs.NodeRmdirer)((*AgeFsNode)(nil))
 var _ = (fs.NodeOpener)((*AgeFsNode)(nil))
 var _ = (fs.NodeGetattrer)((*AgeFsNode)(nil))
+
+func (n *AgeFsNode) Unlink(ctx context.Context, name string) syscall.Errno {
+	return syscall.EROFS
+}
+
+func (n *AgeFsNode) Rmdir(ctx context.Context, name string) syscall.Errno {
+	return syscall.EROFS
+}
 
 func (n *AgeFsNode) Open(ctx context.Context, flags uint32) (fh fs.FileHandle, fuseFlags uint32, errno syscall.Errno) {
 	// disallow writes
@@ -70,7 +80,9 @@ func (n *AgeFsNode) Open(ctx context.Context, flags uint32) (fh fs.FileHandle, f
 		n.Armored = strings.HasPrefix(string(n.Data), armor.Header)
 	}
 
-	if n.Decrypted == nil {
+	var contents = n.Decrypted
+
+	if contents == nil {
 		var reader io.Reader = bytes.NewBuffer(n.Data)
 		if n.Armored {
 			reader = armor.NewReader(reader)
@@ -89,15 +101,17 @@ func (n *AgeFsNode) Open(ctx context.Context, flags uint32) (fh fs.FileHandle, f
 			log.Printf("[ERROR] io.ReadAll: %v\n", err)
 			return nil, 0, syscall.EIO
 		}
-		n.Decrypted = data
+		contents = data
 	}
 
-	fh = &AgeFsFile{Data: n.Decrypted}
+	fh = &AgeFsFile{Data: contents}
 
-	//return fh, fuse.FOPEN_KEEP_CACHE, fs.OK
-
-	// disable kernel cache:
-	return fh, fuse.FOPEN_DIRECT_IO, fs.OK
+	if n.Root.KeepCached {
+		n.Decrypted = contents
+		return fh, fuse.FOPEN_KEEP_CACHE, fs.OK
+	} else {
+		return fh, fuse.FOPEN_DIRECT_IO, fs.OK
+	}
 }
 
 func (n *AgeFsNode) Getattr(ctx context.Context, f fs.FileHandle, out *fuse.AttrOut) syscall.Errno {
@@ -118,15 +132,41 @@ func (n *AgeFsNode) Getattr(ctx context.Context, f fs.FileHandle, out *fuse.Attr
 	return fs.OK
 }
 
+type AgeFsDir struct {
+	fs.Inode
+}
+
+var _ = (fs.NodeUnlinker)((*AgeFsDir)(nil))
+var _ = (fs.NodeRmdirer)((*AgeFsDir)(nil))
+
+func (d *AgeFsDir) Unlink(ctx context.Context, name string) syscall.Errno {
+	return syscall.EROFS
+}
+
+func (d *AgeFsDir) Rmdir(ctx context.Context, name string) syscall.Errno {
+	return syscall.EROFS
+}
+
 type AgeFsRoot struct {
 	fs.Inode
 	Identities []age.Identity
 	Files      []Meta
 	Uid        uint32
 	Gid        uint32
+	KeepCached bool
 }
 
+var _ = (fs.NodeUnlinker)((*AgeFsRoot)(nil))
+var _ = (fs.NodeRmdirer)((*AgeFsRoot)(nil))
 var _ = (fs.NodeOnAdder)((*AgeFsRoot)(nil))
+
+func (root *AgeFsRoot) Unlink(ctx context.Context, name string) syscall.Errno {
+	return syscall.EROFS
+}
+
+func (root *AgeFsRoot) Rmdir(ctx context.Context, name string) syscall.Errno {
+	return syscall.EROFS
+}
 
 func (root *AgeFsRoot) OnAdd(ctx context.Context) {
 	marker := root.NewPersistentInode(ctx, &fs.MemRegularFile{}, fs.StableAttr{Mode: fuse.S_IFREG})
@@ -142,7 +182,7 @@ func (root *AgeFsRoot) OnAdd(ctx context.Context) {
 			}
 			inode := parent.GetChild(component)
 			if inode == nil {
-				inode = parent.NewPersistentInode(ctx, &fs.Inode{}, fs.StableAttr{Mode: fuse.S_IFDIR})
+				inode = parent.NewPersistentInode(ctx, &AgeFsDir{}, fs.StableAttr{Mode: fuse.S_IFDIR})
 				parent.AddChild(component, inode, false)
 			}
 			parent = inode
@@ -167,9 +207,9 @@ func main() {
 	_ = kong.Parse(&cli)
 
 	identitiesPaths := make([]string, 0)
+	keepCached := false
 
 	opts := &fs.Options{}
-	opts.AllowOther = true
 
 	for _, options := range cli.Options {
 		for _, option := range strings.Split(options, ",") {
@@ -178,6 +218,10 @@ func main() {
 				identitiesPaths = append(identitiesPaths, option[len("identity="):])
 			case option == "debug":
 				opts.Debug = true
+			case option == "allow_other":
+				opts.AllowOther = true
+			case option == "keep_cached":
+				keepCached = true
 			default:
 				opts.Options = append(opts.Options, option)
 			}
@@ -239,7 +283,7 @@ func main() {
 
 	uid := uint32(os.Getuid())
 	gid := uint32(os.Getgid())
-	root := &AgeFsRoot{Identities: identities, Files: files, Uid: uid, Gid: gid}
+	root := &AgeFsRoot{Identities: identities, Files: files, Uid: uid, Gid: gid, KeepCached: keepCached}
 
 	server, err := fs.Mount(cli.MountPoint, root, opts)
 	if err != nil {

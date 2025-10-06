@@ -9,7 +9,10 @@ let
   cfg = config.age;
   common = import ./common.nix { inherit pkgs lib; };
 
-  options = lib.map (path: "identity=${path}") cfg.identityPaths ++ [ "nobrowse" ];
+  options = lib.map (path: "identity=${path}") cfg.identityPaths ++ [
+    "allow_other"
+    "nobrowse"
+  ];
 
   args = [
     (lib.getExe cfg.package)
@@ -81,13 +84,15 @@ in
       };
     };
 
-    system.activationScripts.launchd.text = lib.mkAfter ''
-      if [[ ! -e "${cfg.secretsDir}/.agefs" ]]; then
-        /sbin/umount "${cfg.secretsDir}" > /dev/null || true
-        /bin/launchctl kickstart -k system/${config.launchd.labelPrefix}.agefs
-        echo "waiting for agefs..."
-        /bin/wait4path "${cfg.secretsDir}"/.agefs
-      fi
-    '';
+    system.activationScripts = lib.mkIf cfg.wait {
+      launchd.text = lib.mkAfter ''
+        if [[ ! -e "${cfg.secretsDir}/.agefs" ]]; then
+          /sbin/umount "${cfg.secretsDir}" > /dev/null || true
+          /bin/launchctl kickstart -k system/${config.launchd.labelPrefix}.agefs
+          echo "waiting for agefs..."
+          /bin/wait4path "${cfg.secretsDir}"/.agefs
+        fi
+      '';
+    };
   };
 }

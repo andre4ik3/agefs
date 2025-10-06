@@ -16,7 +16,8 @@ let
   options =
     lib.map (path: "identity=${path}") cfg.identityPaths
     ++ lib.optional pkgs.hostPlatform.isLinux "x-gvfs-hide"
-    ++ lib.optional pkgs.hostPlatform.isDarwin "nobrowse";
+    ++ lib.optional pkgs.hostPlatform.isDarwin "nobrowse"
+    ++ lib.optional cfg.keepCached "keep_cached";
 
   args = [
     (lib.getExe cfg.package)
@@ -94,7 +95,7 @@ in
       };
     };
 
-    home.activation = lib.mkIf pkgs.hostPlatform.isDarwin {
+    home.activation = lib.mkIf (pkgs.hostPlatform.isDarwin && cfg.wait) {
       agefs = lib.hm.dag.entryAfter [ "setupLaunchAgents" ] ''
         if [[ ! -e "${cfg.secretsDir}/.agefs" ]]; then
           /sbin/umount "${cfg.secretsDir}" > /dev/null || true

@@ -1,6 +1,6 @@
 {
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    nixpkgs.url = "https://nixpkgs.flake.andre4ik3.dev";
     systems.url = "github:nix-systems/default";
   };
 

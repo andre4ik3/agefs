@@ -31,6 +31,28 @@
   rootOptions = cfg: {
     package = lib.mkPackageOption pkgs "agefs" { };
 
+    keepCached = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      example = true;
+      description = ''
+        Whether to keep decrypted secret contents in-memory after decryption.
+        If false (the default), the file contents are decrypted every time the
+        file is opened. If true, the file contents are decrypted the first time
+        the file is opened, and then stored in memory.
+      '';
+    };
+
+    wait = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      example = false;
+      description = ''
+        Whether to wait for agefs to mount as part of system activation.
+        Currently only supported on Darwin (both system and home).
+      '';
+    };
+
     metaFile = lib.mkOption {
       type = lib.types.package;
       internal = true;

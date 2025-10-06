@@ -9,7 +9,13 @@ let
   cfg = config.age;
   common = import ./common.nix { inherit pkgs lib; };
 
-  options = lib.map (path: "identity=${path}") cfg.identityPaths ++ [ "x-gvfs-hide" ];
+  options =
+    lib.map (path: "identity=${path}") cfg.identityPaths
+    ++ [
+      "allow_other"
+      "x-gvfs-hide"
+    ]
+    ++ lib.optional cfg.keepCached "keep_cached";
 
   secretSubmodule = lib.types.submodule (
     { name, ... }:
@@ -91,7 +97,6 @@ in
   config = lib.mkIf (cfg.secrets != { }) {
     # TODO: figure out why it doesn't work without this, i swear i tried everything
     environment.systemPackages = [ cfg.package ];
-    programs.fuse.userAllowOther = true;
     systemd = {
       automounts = lib.singleton {
         description = "Age Encrypted File System Automount Point";
