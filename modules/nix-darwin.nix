@@ -24,7 +24,7 @@ let
   ];
 
   secretSubmodule = lib.types.submodule (
-    { name, ... }:
+    { config, name, ... }:
     {
       options = common.secretOpts { inherit common name; } // {
         owner = lib.mkOption {
@@ -49,6 +49,7 @@ let
           '';
         };
       };
+      config.path = "${cfg.secretsDir}/${config.name}";
     }
   );
 in

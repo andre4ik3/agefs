@@ -18,35 +18,9 @@ let
     ++ lib.optional cfg.keepCached "keep_cached";
 
   secretSubmodule = lib.types.submodule (
-    { name, ... }:
+    { config, name, ... }:
     {
-      options = {
-        name = lib.mkOption {
-          type = lib.types.str;
-          default = name;
-          example = "hello-world/my-secret";
-          description = ''
-            Relative path where the secret is made available.
-          '';
-        };
-
-        file = lib.mkOption {
-          type = lib.types.path;
-          description = ''
-            The encrypted age file that is decrypted at runtime.
-          '';
-        };
-
-        mode = lib.mkOption {
-          type = lib.types.str;
-          default = "0400";
-          example = "0440";
-          apply = common.octalToInt;
-          description = ''
-            Permission mode of the decrypted file at runtime.
-          '';
-        };
-
+      options = common.secretOpts { inherit common name; } // {
         owner = lib.mkOption {
           type = lib.types.nullOr (lib.types.either lib.types.str lib.types.int);
           default = null;
@@ -69,6 +43,7 @@ let
           '';
         };
       };
+      config.path = "${cfg.secretsDir}/${config.name}";
     }
   );
 in

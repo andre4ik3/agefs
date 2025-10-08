@@ -92,6 +92,7 @@
       name = lib.mkOption {
         type = lib.types.str;
         default = name;
+        defaultText = lib.literalExpression "‹name›";
         example = "hello-world/my-secret";
         description = ''
           Relative path where the secret is made available.
@@ -112,6 +113,15 @@
         apply = common.octalToInt;
         description = ''
           Permission mode of the decrypted file at runtime.
+        '';
+      };
+
+      path = lib.mkOption {
+        type = lib.types.path;
+        defaultText = lib.literalExpression "‹secretsDir›/‹name›";
+        readOnly = true;
+        description = ''
+          Absolute path to the decrypted file at runtime.
         '';
       };
     };
