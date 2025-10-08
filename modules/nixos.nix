@@ -7,6 +7,7 @@
 
 let
   cfg = config.age;
+  inherit (config) users;
   common = import ./common.nix { inherit pkgs lib; };
 
   options =
@@ -26,7 +27,7 @@ let
           default = null;
           defaultText = "current group";
           example = "user";
-          apply = common.tryMaybeGetId "UID" "user" config.users.users;
+          apply = common.tryMaybeGetId "UID" "user" users.users;
           description = ''
             User owner of the decrypted file at runtime. If null, defaults to the current user.
           '';
@@ -37,7 +38,7 @@ let
           default = null;
           defaultText = "current group";
           example = "user";
-          apply = common.tryMaybeGetId "GID" "group" config.users.groups;
+          apply = common.tryMaybeGetId "GID" "group" users.groups;
           description = ''
             Group owner of the decrypted file at runtime. If null, defaults to the current group.
           '';
