@@ -12,9 +12,8 @@ jobs:
         include:
           - nix-system: "aarch64-darwin"
             runner: "macos-15"
-          # TODO: no KVM, required for NixOS test
-          # - nix-system: "aarch64-linux"
-          #   runner: "ubuntu-24.04-arm"
+          - nix-system: "aarch64-linux"
+            runner: "ubuntu-24.04-arm"
           - nix-system: "x86_64-linux"
             runner: "ubuntu-latest"
           - nix-system: "x86_64-darwin"
@@ -28,4 +27,6 @@ jobs:
         run: nix build -vL
 
       - name: "Run tests"
+        # TODO: no KVM, required for NixOS test
+        if: ${{ matrix.nix-system != 'aarch64-linux' }}
         run: nix flake check
