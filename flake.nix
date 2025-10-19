@@ -12,18 +12,27 @@
       eachSystem = f: lib.genAttrs systems (system: f nixpkgs.legacyPackages.${system});
     in
     {
-      nixosModules = rec {
-        default = agefs;
+      nixosModules = {
+        default = {
+          imports = [ self.nixosModules.agefs ];
+          nixpkgs.overlays = [ self.overlays.default ];
+        };
         agefs = ./modules/nixos.nix;
       };
 
-      darwinModules = rec {
-        default = agefs;
+      darwinModules = {
+        default = {
+          imports = [ self.darwinModules.agefs ];
+          nixpkgs.overlays = [ self.overlays.default ];
+        };
         agefs = ./modules/nix-darwin.nix;
       };
 
-      homeModules = rec {
-        default = agefs;
+      homeModules = {
+        default = {
+          imports = [ self.homeModules.agefs ];
+          nixpkgs.overlays = [ self.overlays.default ];
+        };
         agefs = ./modules/home-manager.nix;
       };
 
@@ -39,13 +48,28 @@
         };
       };
 
-      devShells = eachSystem (pkgs: rec {
+      devShells = eachSystem (pkgs: {
         default = pkgs.mkShellNoCC {
           packages = with pkgs; [
+            age
             go
             age-plugin-se
             age-plugin-tpm
           ];
+        };
+      });
+
+      checks = eachSystem (pkgs: let
+        pkgs' = import pkgs.path {
+          inherit (pkgs) system;
+          overlays = [ self.overlays.default ];
+        };
+      in {
+        # TODO: home-manager test
+      } // lib.optionalAttrs pkgs.hostPlatform.isLinux {
+        system = pkgs'.testers.runNixOSTest {
+          imports = [ ./tests/nixos.nix ];
+          extraBaseModules.imports = [ self.nixosModules.agefs ];
         };
       });
     };

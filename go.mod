@@ -1,6 +1,8 @@
 module agefs
 
-go 1.25
+go 1.24.0
+
+toolchain go1.24.6
 
 require (
 	filippo.io/age v1.2.1

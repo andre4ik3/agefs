@@ -1,0 +1,29 @@
+name: CI
+on: push
+
+jobs:
+  test:
+    name: "Run tests"
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - nix-system: "aarch64-darwin"
+            runner: "macos-15"
+          - nix-system: "aarch64-linux"
+            runner: "ubuntu-24.04-arm"
+          - nix-system: "x86_64-linux"
+            runner: "ubuntu-latest"
+          - nix-system: "x86_64-darwin"
+            runner: "macos-15-intel"
+
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+
+      - name: "Build agefs"
+        run: nix build -vL
+
+      - name: "Run tests"
+        run: nix flake check
