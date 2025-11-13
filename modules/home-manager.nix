@@ -13,10 +13,12 @@ let
     config = { };
   };
 
+  inherit (pkgs.stdenv.hostPlatform) isLinux isDarwin;
+
   options =
     lib.map (path: "identity=${path}") cfg.identityPaths
-    ++ lib.optional pkgs.hostPlatform.isLinux "x-gvfs-hide"
-    ++ lib.optional pkgs.hostPlatform.isDarwin "nobrowse"
+    ++ lib.optional isLinux "x-gvfs-hide"
+    ++ lib.optional isDarwin "nobrowse"
     ++ lib.optional cfg.keepCached "keep_cached";
 
   args = [
@@ -24,7 +26,7 @@ let
     "-o"
     (lib.concatStringsSep "," options)
   ]
-  ++ lib.optional pkgs.hostPlatform.isDarwin "-f"
+  ++ lib.optional isDarwin "-f"
   ++ [
     cfg.metaFile
     cfg.secretsDir
@@ -96,7 +98,7 @@ in
       };
     };
 
-    home.activation = lib.mkIf (pkgs.hostPlatform.isDarwin && cfg.wait) {
+    home.activation = lib.mkIf (isDarwin && cfg.wait) {
       agefs = lib.hm.dag.entryAfter [ "setupLaunchAgents" ] ''
         if [[ ! -e "${cfg.secretsDir}/.agefs" ]]; then
           /sbin/umount "${cfg.secretsDir}" > /dev/null || true
