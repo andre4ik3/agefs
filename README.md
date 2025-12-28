@@ -1,7 +1,7 @@
 agefs
 =====
 
-A FUSE filesystem that decrypts your secrets on-the-fly as they are accessed.
+A FUSE filesystem that decrypts age secrets on-the-fly as they are accessed.
 
 ## Documentation
 

@@ -1,14 +1,16 @@
 {
-  inputs = {
-    nixpkgs.url = "https://nixpkgs.flake.andre4ik3.dev";
-    systems.url = "github:nix-systems/default";
-  };
+  inputs.nixpkgs.url = "https://nixpkgs.flake.andre4ik3.dev";
 
   outputs =
-    { nixpkgs, self, ... }@inputs:
+    { nixpkgs, self, ... }:
     let
       inherit (nixpkgs) lib;
-      systems = import inputs.systems;
+      systems = [
+        "aarch64-darwin"
+        "aarch64-linux"
+        "x86_64-darwin"
+        "x86_64-linux"
+      ];
       eachSystem = f: lib.genAttrs systems (system: f nixpkgs.legacyPackages.${system});
     in
     {
@@ -41,8 +43,8 @@
         agefs = pkgs.callPackage ./package.nix { };
       });
 
-      overlays = rec {
-        default = agefs;
+      overlays = {
+        default = self.overlays.agefs;
         agefs = final: prev: {
           agefs = final.callPackage ./package.nix { };
         };
@@ -59,18 +61,23 @@
         };
       });
 
-      checks = eachSystem (pkgs: let
-        pkgs' = import pkgs.path {
-          inherit (pkgs) system;
-          overlays = [ self.overlays.default ];
-        };
-      in {
-        # TODO: home-manager test
-      } // lib.optionalAttrs pkgs.hostPlatform.isLinux {
-        system = pkgs'.testers.runNixOSTest {
-          imports = [ ./tests/nixos.nix ];
-          extraBaseModules.imports = [ self.nixosModules.agefs ];
-        };
-      });
+      checks = eachSystem (
+        pkgs:
+        let
+          pkgs' = import pkgs.path {
+            inherit (pkgs) system;
+            overlays = [ self.overlays.default ];
+          };
+        in
+        {
+          # TODO: home-manager test
+        }
+        // lib.optionalAttrs pkgs.hostPlatform.isLinux {
+          system = pkgs'.testers.runNixOSTest {
+            imports = [ ./tests/nixos.nix ];
+            extraBaseModules.imports = [ self.nixosModules.agefs ];
+          };
+        }
+      );
     };
 }
