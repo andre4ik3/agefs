@@ -36,9 +36,7 @@ var _ = (fs.FileReader)((*AgeFsFile)(nil))
 
 func (f *AgeFsFile) Read(ctx context.Context, dest []byte, off int64) (fuse.ReadResult, syscall.Errno) {
 	end := off + int64(len(dest))
-	if end > int64(len(f.Data)) {
-		end = int64(len(f.Data))
-	}
+	end = min(end, int64(len(f.Data)))
 
 	return fuse.ReadResultData(f.Data[off:end]), fs.OK
 }
@@ -176,7 +174,7 @@ func (root *AgeFsRoot) OnAdd(ctx context.Context) {
 		dir, name := filepath.Split(filepath.Clean(file.Name))
 		parent := &root.Inode
 
-		for _, component := range strings.Split(dir, "/") {
+		for component := range strings.SplitSeq(dir, "/") {
 			if component == "" {
 				continue
 			}
@@ -206,16 +204,19 @@ func main() {
 	var cli = CLI
 	_ = kong.Parse(&cli)
 
+	path := append(make([]string, 1), os.Getenv("PATH"))
 	identitiesPaths := make([]string, 0)
 	keepCached := false
 
 	opts := &fs.Options{}
 
 	for _, options := range cli.Options {
-		for _, option := range strings.Split(options, ",") {
+		for option := range strings.SplitSeq(options, ",") {
 			switch {
 			case strings.HasPrefix(option, "identity="):
 				identitiesPaths = append(identitiesPaths, option[len("identity="):])
+			case strings.HasPrefix(option, "path="):
+				path = append(path, option[len("path="):])
 			case option == "debug":
 				opts.Debug = true
 			case option == "allow_other":
@@ -227,6 +228,8 @@ func main() {
 			}
 		}
 	}
+
+	os.Setenv("PATH", strings.Join(path, ":"))
 
 	if len(identitiesPaths) == 0 {
 		log.Fatal("At least one identity file must be specified using identity=... option")

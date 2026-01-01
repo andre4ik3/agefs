@@ -16,7 +16,8 @@ let
       "allow_other"
       "x-gvfs-hide"
     ]
-    ++ lib.optional cfg.keepCached "keep_cached";
+    ++ lib.optional cfg.keepCached "keep_cached"
+    ++ lib.map (path: "path=${lib.getBin path}/bin") cfg.pluginPackages;
 
   secretSubmodule = lib.types.submodule (
     { config, name, ... }:
@@ -71,7 +72,9 @@ in
   };
 
   config = lib.mkIf (cfg.secrets != { }) {
-    # TODO: figure out why it doesn't work without this, i swear i tried everything
+    # Putting ourselves in systemPackages is required because `mount` in
+    # util-linux, which systemd mount units are hardwired to use, resets the
+    # PATH, and it breaks when we daemonize, which systemd mount units must do.
     environment.systemPackages = [ cfg.package ];
     systemd = {
       automounts = lib.singleton {
@@ -85,9 +88,6 @@ in
         where = cfg.secretsDir;
         type = "fuse.agefs";
         options = lib.concatStringsSep "," options;
-        mountConfig.Environment = "PATH=${
-          lib.makeBinPath ([ cfg.package ] ++ cfg.pluginPackages)
-        }:/run/wrappers/bin:/run/current-system/sw/bin";
         wantedBy = [ "multi-user.target" ];
       };
     };
