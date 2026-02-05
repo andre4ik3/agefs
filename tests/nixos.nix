@@ -18,5 +18,7 @@
     machine.wait_for_unit("default.target")
     machine.succeed("cat /run/agenix/age | grep 'hello world'")
     machine.succeed("cat /run/agenix/ssh | grep 'hello world'")
+    machine.fail("sudo -u nobody cat /run/agenix/age")
+    machine.fail("sudo -u nobody cat /run/agenix/ssh")
   '';
 }

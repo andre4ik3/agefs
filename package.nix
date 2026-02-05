@@ -17,7 +17,7 @@ buildGoModule (finalAttrs: {
 
   src = ./.;
 
-  vendorHash = "sha256-pZw6JUiy9XOKGf9VLd58fHSw58tbh/Dkbv5ywtdN944=";
+  vendorHash = "sha256-SnHvssGx71fkGSCK35/K5rozQ2PevurOPVeUFhuGL9s=";
 
   nativeBuildInputs = [ makeWrapper ];
 

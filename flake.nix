@@ -11,7 +11,13 @@
         "x86_64-darwin"
         "x86_64-linux"
       ];
-      eachSystem = f: lib.genAttrs systems (system: f nixpkgs.legacyPackages.${system});
+      mkPkgs =
+        system:
+        import nixpkgs {
+          inherit system;
+          overlays = [ self.overlays.agefs ];
+        };
+      eachSystem = f: lib.genAttrs systems (system: f (mkPkgs system));
     in
     {
       nixosModules = {
@@ -38,9 +44,9 @@
         agefs = ./modules/home-manager.nix;
       };
 
-      packages = eachSystem (pkgs: rec {
-        default = agefs;
-        agefs = pkgs.callPackage ./package.nix { };
+      packages = eachSystem (pkgs: {
+        default = pkgs.agefs;
+        inherit (pkgs) agefs;
       });
 
       overlays = {
@@ -63,17 +69,11 @@
 
       checks = eachSystem (
         pkgs:
-        let
-          pkgs' = import pkgs.path {
-            inherit (pkgs) system;
-            overlays = [ self.overlays.default ];
-          };
-        in
         {
           # TODO: home-manager test
         }
         // lib.optionalAttrs pkgs.hostPlatform.isLinux {
-          system = pkgs'.testers.runNixOSTest {
+          system = pkgs.testers.runNixOSTest {
             imports = [ ./tests/nixos.nix ];
             extraBaseModules.imports = [ self.nixosModules.agefs ];
           };
