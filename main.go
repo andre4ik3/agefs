@@ -209,6 +209,7 @@ func main() {
 	keepCached := false
 
 	opts := &fs.Options{}
+	opts.Options = []string{"default_permissions"}
 
 	for _, options := range cli.Options {
 		for option := range strings.SplitSeq(options, ",") {
