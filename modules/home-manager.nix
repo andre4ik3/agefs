@@ -8,10 +8,6 @@
 let
   cfg = config.age;
   common = import ./common.nix { inherit pkgs lib; };
-  utils = import "${pkgs.path}/nixos/lib/utils.nix" {
-    inherit lib pkgs;
-    config = { };
-  };
 
   inherit (pkgs.stdenv.hostPlatform) isLinux isDarwin;
 
@@ -71,30 +67,22 @@ in
       enable = lib.mkDefault true;
       config = {
         EnvironmentVariables.PATH = lib.makeBinPath cfg.pluginPackages;
-        ProgramArguments = lib.map toString args;
+        ProgramArguments = map toString args;
         RunAtLoad = true;
         KeepAlive.SuccessfulExit = false;
       };
     };
 
-    systemd.user = {
-      # Regular users don't have permissions to do automounts
-      # automounts.${utils.escapeSystemdPath cfg.secretsDir} = {
-      #   Automount.Where = cfg.secretsDir;
-      #   Install.WantedBy = [ "default.target" ];
-      # };
-      mounts.${utils.escapeSystemdPath cfg.secretsDir} = {
-        Unit.Description = "Age Encrypted File System";
-        Mount = {
-          What = cfg.metaFile;
-          Where = cfg.secretsDir;
-          Type = "fuse.agefs";
-          Options = lib.concatStringsSep "," options;
-          Environment = "PATH=${
-            lib.makeBinPath ([ cfg.package ] ++ cfg.pluginPackages)
-          }:/run/wrappers/bin:/run/current-system/sw/bin";
-        };
-        Install.WantedBy = [ "basic.target" ];
+    systemd.user.services.agefs = {
+      Unit.Description = "Age Encrypted File System";
+      Install.WantedBy = [ "default.target" ];
+      Service = {
+        Type = "forking";
+        ExecStart = lib.escapeShellArgs args;
+        Environment = "PATH=${
+          lib.makeBinPath ([ cfg.package ] ++ cfg.pluginPackages)
+        }:/run/wrappers/bin:/run/current-system/sw/bin";
+        Restart = "on-failure";
       };
     };
 
